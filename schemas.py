@@ -1,48 +1,36 @@
 """
-Database Schemas
+Database Schemas for Calendar SMS Reminders
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model corresponds to a MongoDB collection (lowercased name).
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
-
-# Example schemas (replace with your own):
+from typing import Optional, List
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
+    """Stores a user with Google OAuth linkage and SMS number"""
     email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    phone_e164: str = Field(..., description="SMS number in E.164 format, e.g., +15551234567")
+    timezone: str = Field(..., description="IANA timezone, e.g., America/New_York")
+    # Minimal token storage (encrypted at rest in real app); here we store refresh token only
+    google_refresh_token: Optional[str] = Field(None, description="Google OAuth refresh token")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Subscription(BaseModel):
+    """Stores a Google Calendar watch channel for push notifications (optional enhancement)"""
+    user_email: str = Field(...)
+    channel_id: str = Field(...)
+    resource_id: str = Field(...)
+    expiration: int = Field(..., description="Unix ms expiration of the channel")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class ReminderRule(BaseModel):
+    """User preference for how long before events to text"""
+    user_email: str = Field(...)
+    minutes_before: int = Field(10, ge=1, le=10080, description="How many minutes before start to notify")
+    active: bool = Field(True)
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class OutboundLog(BaseModel):
+    """Keeps a log of SMS messages we sent, to dedupe"""
+    user_email: str = Field(...)
+    event_id: str = Field(...)
+    sent_at_ts: int = Field(..., description="UTC epoch seconds when sent")
+    message: str = Field(...)
